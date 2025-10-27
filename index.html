@@ -1,0 +1,1906 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retro Plane Shooter - Final V9 (Skill Toggle & New Skins)</title>
+    <style>
+        /* --- CSS --- */
+        
+        body {
+            background-color: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Press Start 2P', cursive;
+        }
+        
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        #game-area {
+            position: relative;
+            width: 360px;
+            height: 640px;
+            border: 5px solid cyan;
+            overflow: hidden;
+            touch-action: none; 
+        }
+
+        #game-canvas {
+            background-color: #000033;
+            display: block;
+        }
+
+        /* Tampilan Menu/Kontrol */
+        #ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Biarkan klik menembus ke kanvas jika di luar tombol */
+            z-index: 10;
+        }
+
+        /* Perbaikan: Pastikan tombol-tombol di controls punya posisi dan bisa disentuh */
+        #controls {
+            position: absolute; 
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; 
+        }
+
+        #controls > div {
+            /* Agar tombol bisa diklik meskipun parent pointer-events: none */
+            pointer-events: auto; 
+            z-index: 50; /* Pastikan di atas kanvas */
+            position: absolute;
+            box-sizing: border-box; 
+            border: 1px solid transparent; /* Garis tepi untuk mode pengaturan */
+        }
+        
+        /* Gaya analog dan tombol default */
+        .mobile-btn-base {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            font-size: 20px;
+            color: white;
+            cursor: pointer;
+            user-select: none;
+            touch-action: none;
+        }
+        
+        #analog-pad {
+            width: 100px;
+            height: 100px;
+            left: 20px;
+            bottom: 20px;
+        }
+
+        #analog-stick {
+            width: 30px;
+            height: 30px;
+            background-color: rgba(255, 255, 255, 0.7);
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        /* Tampilan Menu/Kontrol */
+        #menu-container, #game-over-screen, #level-select-screen, #skin-select-screen, #image-upload-screen, #high-score-screen, #hud-settings-screen, #shop-menu, #toggle-screen { 
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 10px;
+            text-align: center;
+            pointer-events: auto;
+            padding: 20px;
+            box-sizing: border-box;
+            overflow-y: auto;
+            z-index: 100;
+        }
+        
+        /* Tambahan untuk Shop/Toggle */
+        #shop-items, #toggle-options {
+            width: 90%;
+            max-width: 350px;
+            margin-top: 20px;
+            border: 2px solid yellow;
+            padding: 10px;
+            background-color: #111;
+        }
+        .shop-item, .toggle-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px dashed gray;
+        }
+        .shop-item:last-child, .toggle-item:last-child {
+            border-bottom: none;
+        }
+        .shop-item-desc, .toggle-item-desc {
+            text-align: left;
+            flex-grow: 1;
+            font-size: 8px;
+            padding-right: 5px;
+        }
+        .shop-item-price {
+            margin-right: 10px;
+            color: gold;
+            white-space: nowrap;
+        }
+        
+        /* Gaya UI Umum */
+        .retro-title {
+            font-size: 24px;
+            color: lime;
+            text-shadow: 0 0 5px lime, 0 0 10px green;
+            margin-bottom: 20px;
+        }
+        .retro-button {
+            padding: 10px 20px;
+            margin: 7px;
+            background-color: #333;
+            border: 2px solid cyan;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.1s;
+            font-size: 8px; 
+            white-space: nowrap;
+        }
+        .retro-button:hover { background-color: #555; }
+        
+        .toggle-btn {
+            padding: 5px 10px;
+            margin: 0;
+            font-size: 7px;
+        }
+        /* Style untuk HUD draggable/resizable di menu pengaturan */
+        .hud-draggable {
+             border: 2px dashed lime !important;
+             cursor: move;
+        }
+        .hud-resizable::after {
+            content: '⇲'; 
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: rgba(0, 255, 0, 0.5);
+            cursor: nwse-resize;
+            font-size: 12px;
+            z-index: 101;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-area">
+        <canvas id="game-canvas" width="360" height="640"></canvas>
+        <div id="ui-overlay">
+            
+            <div id="controls">
+                
+                <div id="analog-pad" class="mobile-btn-base">
+                    <div id="analog-stick"></div>
+                </div>
+
+                <div id="btn-rocket" class="mobile-btn mobile-btn-base" style="right: 20px; bottom: 100px;">💥</div> 
+                <div id="btn-phoenix-laser" class="mobile-btn mobile-btn-base" style="right: 90px; bottom: 20px; display: none;">❗</div> 
+                <div id="btn-powerup" class="mobile-btn mobile-btn-base" style="right: 20px; bottom: 180px;">⏫</div> 
+                <div id="btn-shoot" class="mobile-btn mobile-btn-base" style="right: 20px; bottom: 20px;">🚀</div>
+            </div>
+
+            <div id="game-info">
+                SCORE: <span id="score-display">0</span><br>
+                COIN: <span id="coin-display-game">0</span>🪙<br>
+                POW: <span id="powerup-display">NONE</span><br>
+                HEALTH: <span id="health-display">3.00</span><br>
+                ROCKET: <span id="rocket-display">3</span> 
+            </div>
+            
+            <div id="coin-display-menu">
+                COIN: <span id="coin-display-ui">190000</span>🪙
+            </div>
+
+            <div id="menu-container">
+                <div class="retro-title">RETRO PLANE SHOOTER</div>
+                <div class="retro-button" onclick="showSkinSelect()">START GAME</div>
+                <div class="retro-button" onclick="showShopMenu()">UPGRADE SHOP</div>
+                <div class="retro-button" onclick="showToggleScreen()">AKTIFKAN SKILL</div>
+                <div class="retro-button" onclick="showHudSettings()">PENGATURAN HUD</div>
+                <div class="retro-button" onclick="showImageUpload()">CUSTOM GAMBAR</div> 
+                <div class="retro-button" onclick="showHighScore()">SKOR TERTINGGI</div> 
+            </div>
+
+            <div id="shop-menu" style="display: none;">
+                <div class="retro-title">UPGRADE SHOP</div>
+                <p style="color: yellow; font-size: 8px;">Koin Anda: <span id="shop-coin-display">0</span>🪙</p>
+                
+                <div id="shop-items">
+                    
+                    <div class="shop-item">
+                        <div class="shop-item-desc">Skin Ultimate TERANA (HP 50, Tembakan 4x Kuat)</div>
+                        <div class="shop-item-price"><span id="terana-price">8000</span>🪙</div>
+                        <button class="retro-button" style="margin: 0;" id="terana-skin-button" onclick="buyItem('terana_skin')">Beli</button>
+                    </div>
+
+                    <div class="shop-item">
+                        <div class="shop-item-desc">Skin THREEKING (HP 100, Laser Ganda Ungu, Proyektil Penarik)</div>
+                        <div class="shop-item-price">5000🪙</div>
+                        <button class="retro-button" style="margin: 0;" id="threeking-skin-button" onclick="buyItem('threeking_skin')">Beli</button>
+                    </div>
+
+                    <div class="shop-item">
+                        <div class="shop-item-desc">Tembakan 6x (Hanya Skin STANDAR) - Peluru 🔥</div>
+                        <div class="shop-item-price"><span id="six-shot-price">0</span>🪙</div>
+                        <button class="retro-button" style="margin: 0;" id="six-shot-button" onclick="buyItem('six_shot')">Beli</button>
+                    </div>
+
+                    <div class="shop-item">
+                        <div class="shop-item-desc">Pesawat Tim Permanen (Klon)</div>
+                        <div class="shop-item-price">500🪙</div>
+                        <button class="retro-button" style="margin: 0;" id="clone-button" onclick="buyItem('clone')">Beli</button>
+                    </div>
+
+                    <div class="shop-item">
+                        <div class="shop-item-desc">Upgrade Laser (Lebih Panjang & Kuat)</div>
+                        <div class="shop-item-price">1000🪙</div>
+                        <button class="retro-button" style="margin: 0;" id="red-laser-button" onclick="buyItem('red_laser')">Beli</button>
+                    </div>
+
+                    <div class="shop-item">
+                        <div class="shop-item-desc">Peluru Utama ♠ (Damage: 10)</div>
+                        <div class="shop-item-price">800🪙</div>
+                        <button class="retro-button" style="margin: 0;" id="spade-bullet-button" onclick="buyItem('spade_bullet')">Beli</button>
+                    </div>
+                    
+                    <div class="shop-item" id="damage-upgrade-item">
+                        <div class="shop-item-desc">Tingkatkan Base Damage Peluru (Level <span id="current-damage-level">1</span>/10)</div>
+                        <div class="shop-item-price"><span id="damage-upgrade-price">50</span>🪙</div>
+                        <button class="retro-button" style="margin: 0;" onclick="buyItem('damage_upgrade')">Upgrade</button>
+                    </div>
+                </div>
+                
+                <div class="retro-button" onclick="showMenu()" style="margin-top: 20px;">KEMBALI KE MENU</div>
+            </div>
+
+            <div id="toggle-screen" style="display: none;">
+                <div class="retro-title">AKTIFKAN SKILL</div>
+                <p style="font-size: 8px; color: yellow;">Skill Aktif: <span id="active-skill-count">0</span> / 2</p>
+                <div id="toggle-options">
+                    </div>
+                <div class="retro-button" onclick="showMenu()" style="margin-top: 20px;">KEMBALI KE MENU</div>
+            </div>
+
+
+            <div id="hud-settings-screen" style="display: none;">
+                <div class="retro-title">ATUR POSISI KONTROL</div>
+                <p style="font-size: 8px; color: yellow; margin-bottom: 20px;">Tarik dan ubah ukuran tombol-tombol di latar belakang.</p>
+                <div style="width: 80%;">
+                    <button class="retro-button" onclick="saveHudSettings()">SIMPAN PENGATURAN</button>
+                    <button class="retro-button" onclick="resetHudSettings()">RESET DEFAULT</button>
+                </div>
+                <div class="retro-button" onclick="showMenu()" style="margin-top: 20px;">KEMBALI KE MENU</div>
+            </div>
+
+            <div id="high-score-screen" style="display: none;">
+                <div class="retro-title">SKOR TERTINGGI</div>
+                <ul id="high-score-list">
+                    </ul>
+                <div class="retro-button" onclick="showMenu()">KEMBALI KE MENU</div>
+            </div>
+
+            <div id="image-upload-screen" style="display: none;">
+                <div class="retro-title">UPLOAD GAMBAR CUSTOM</div>
+                <p style="font-size: 7px; color: gray;">*Gambar disimpan di peramban (permanen sampai cache dihapus). Max 5MB.</p>
+
+                <div class="file-input-container">
+                    <h4>GAMBAR PLAYER</h4>
+                    <input type="file" id="upload-player" accept="image/*" onchange="handleImageUpload(this, 'player')" />
+                    <button class="retro-button" style="font-size: 7px; margin: 5px;" onclick="clearCustomImage('player')">RESET</button>
+                </div>
+                
+                <div class="file-input-container">
+                    <h4>GAMBAR ENEMY NORMAL</h4>
+                    <input type="file" id="upload-enemy" accept="image/*" onchange="handleImageUpload(this, 'enemy')" />
+                    <button class="retro-button" style="font-size: 7px; margin: 5px;" onclick="clearCustomImage('enemy')">RESET</button>
+                </div>
+
+                <div class="file-input-container">
+                    <h4>GAMBAR FINAL BOSS</h4>
+                    <input type="file" id="upload-boss" accept="image/*" onchange="handleImageUpload(this, 'boss')" />
+                    <button class="retro-button" style="font-size: 7px; margin: 5px;" onclick="clearCustomImage('boss')">RESET</button>
+                </div>
+
+                <div class="retro-button" onclick="showMenu()">KEMBALI KE MENU</div>
+            </div>
+
+            <div id="skin-select-screen" style="display: none;">
+                <div class="retro-title">PILIH SKIN PESAWAT</div>
+                <div id="skin-options">
+                    </div>
+                <div id="skin-description" style="margin-top: 15px; color: yellow; font-size: 7px; height: 30px;">Pilih skin untuk melihat deskripsi.</div>
+                <div class="retro-button" onclick="showLevelSelect()">KONFIRMASI & PILIH LEVEL</div>
+                <div class="retro-button" onclick="showMenu()">KEMBALI KE MENU</div>
+            </div>
+
+            <div id="level-select-screen" style="display: none;">
+                <div class="retro-title">PILIH LEVEL</div>
+                <div class="retro-button" onclick="startGame(1)">LEVEL 1 (MUDAH)</div>
+                <div class="retro-button" onclick="startGame(2)">LEVEL 2 (SULIT)</div>
+                <div class="retro-button" onclick="showSkinSelect()">KEMBALI KE SKIN</div>
+            </div>
+
+            <div id="game-over-screen" style="display: none;">
+                <div class="retro-title" id="final-message">GAME OVER!</div>
+                <div style="margin-bottom: 20px;">SKOR AKHIR: <span id="final-score">0</span></div>
+                <div class="retro-button" onclick="showMenu()">MENU UTAMA</div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // --- JAVASCRIPT LOGIC ---
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const GAME_WIDTH = canvas.width;
+        const GAME_HEIGHT = canvas.height;
+        const POWERUP_DURATION = 10000;
+        const LASER_DURATION = 60000; 
+        const MAX_ACTIVE_UPGRADES = 2;
+        // Gunakan harga random yang sama dengan yang dihitung sebelumnya
+        const SIX_SHOT_PRICE = Math.floor(Math.random() * (999 - 101 + 1)) + 101; 
+        
+        const BOSS_TRIGGERS = [100, 300, 500, 600, 700, 1000];
+        let nextBossTrigger = BOSS_TRIGGERS[0];
+        let bossLevel = 0;
+
+        const HEALTH_PER_KILL = 0.25; 
+        const ROCKET_COOLDOWN = 5000; 
+        
+        let laserTimeout = null; 
+        let phoenixLaserTimeout = null; 
+        let spawnInterval = null; 
+        
+        // --- Game State & Persistence ---
+        let gameState = 'MENU';
+        let entities = [];
+        let score = 0;
+        let lastTime = 0;
+        let player = null;
+        let enemiesKilled = 0;
+        let currentPowerupTimeout = null;
+        let currentLevel = 1;
+
+        let gameCoins = 0; 
+        let totalCoins = 0; 
+
+        let isAnalogDragging = false;
+        let analogCenter = { x: 0, y: 0 };
+        const ANALOG_RADIUS = 35; 
+        let analogDX = 0; 
+        let analogDY = 0; 
+        let animationFrameId = null; 
+        let screenShakeOffset = 0; 
+        
+        const CUSTOM_IMAGES = { player: null, enemy: null, boss: null };
+        const IMAGE_CACHE = {}; 
+        
+        // --- Shop & Upgrade State ---
+        const UPGRADE_STATE = {
+            damageLevel: 1, // Max 10
+            hasClone: false,
+            hasRedLaserUpgrade: false,
+            hasSpadeBullet: false,
+            hasTeranaSkin: false, 
+            hasThreeKingSkin: false, // New skin
+            hasSixShotFire: false, // New item
+            activeUpgrades: [], // Toggled upgrades
+        };
+
+        const TOGGLE_UPGRADES_MAP = {
+            clone: { name: "Pesawat Tim Permanen (Klon)", available: () => UPGRADE_STATE.hasClone },
+            red_laser: { name: "Upgrade Laser Merah (Lbh Kuat)", available: () => UPGRADE_STATE.hasRedLaserUpgrade },
+            spade_bullet: { name: "Peluru Utama ♠ (Dmg 10)", available: () => UPGRADE_STATE.hasSpadeBullet },
+            six_shot_fire: { 
+                name: "Tembakan 6x (🔥)", 
+                available: () => UPGRADE_STATE.hasSixShotFire, 
+                skinReq: 'STANDAR' 
+            }
+        };
+        
+        // --- SKINS ---
+        const SKINS = {
+             STANDARD: { name: "STANDAR", color: "cyan", perk: "NONE", desc: "Pesawat standar, tanpa kemampuan spesial.", damageModifier: 1.0, speedModifier: 1.0, initialHealth: 3, shootCooldown: 200 },
+             RED_STREAK: { name: "RED STREAK", color: "red", perk: "FAST_SHOOT", desc: "Kecepatan tembak +50%.", damageModifier: 1.0, speedModifier: 1.0, initialHealth: 3, shootCooldown: 130 },
+             GREEN_TANK: { name: "GREEN TANK", color: "green", perk: "TANK", desc: "Darah Awal +2 (Total 5 Darah), kecepatan gerak -20%.", damageModifier: 1.0, speedModifier: 0.8, initialHealth: 5, shootCooldown: 200 },
+             PHOENIX: { name: "PHOENIX", color: "orange", perk: "TRIPLE_PERMANENT", desc: "Tembakan Tiga Peluru (Permanen). Darah Awal +1. Power-up menjadi Laser Kiri Kanan + Gelombang.", damageModifier: 1.2, speedModifier: 1.1, initialHealth: 4, shootCooldown: 180 },
+             TERANA: { name: "TERANA", color: "white", perk: "ULTIMATE_TERANA", desc: "HP 50. Tembakan 4 sekaligus (2 Laser Putih, 2 Peluru ♣ Dmg 10).", damageModifier: 1.0, speedModifier: 1.0, initialHealth: 50, shootCooldown: 200 },
+             THREEKING: { 
+                name: "THREEKING", 
+                color: "black", 
+                perk: "THREEKING_NEW", // Ganti perk
+                desc: "HP 100. Tembakan utama Laser Ganda Ungu. Setiap 10 tembakan, menembakkan Proyektil Penarik Musuh.", // Ganti deskripsi
+                damageModifier: 1.0, 
+                speedModifier: 1.0, 
+                initialHealth: 100, 
+                shootCooldown: 150 // Buat lebih cepat
+            }
+        };
+        let selectedSkin = SKINS.STANDARD;
+        
+        // --- Pengaturan HUD ---
+        const DEFAULT_HUD_SETTINGS = {
+            'analog-pad': { width: 100, height: 100, left: 20, bottom: 20 },
+            'btn-rocket': { width: 60, height: 60, right: 20, bottom: 100 },
+            'btn-phoenix-laser': { width: 60, height: 60, right: 90, bottom: 20 },
+            'btn-powerup': { width: 60, height: 60, right: 20, bottom: 180 },
+            'btn-shoot': { width: 60, height: 60, right: 20, bottom: 20 }
+        };
+        let currentHudSettings = {};
+
+        // --- Kelas Entitas (Inti) ---
+        
+        class Entity {
+            constructor(x, y, w, h, type, color = 'white', health = 1, damage = 1) {
+                this.x = x; this.y = y; this.width = w; this.height = h;
+                this.type = type; this.color = color; this.health = health;
+                this.damage = damage; this.isAlive = true; this.hitCount = 0; 
+                this.maxHealth = health; 
+            }
+            draw() {
+                 let imageToDraw = null;
+                
+                if (this.type === 'player' || this.type === 'clone') {
+                    imageToDraw = CUSTOM_IMAGES.player;
+                } else if (this.type.startsWith('enemy')) {
+                    imageToDraw = CUSTOM_IMAGES.enemy;
+                } else if (this.type.startsWith('boss')) {
+                    imageToDraw = CUSTOM_IMAGES.boss;
+                }
+
+                ctx.save();
+                if (this === player && (player.powerup === 'Invulnerability' || player.isInvulnerable)) {
+                    ctx.globalAlpha = (Math.sin(performance.now() / 50) + 1) / 4 + 0.5; // Flicker effect
+                }
+
+                if (imageToDraw) {
+                    ctx.drawImage(imageToDraw, this.x, this.y, this.width, this.height);
+                } else {
+                    ctx.fillStyle = this.color; 
+                    ctx.fillRect(this.x, this.y, this.width, this.height);
+                }
+                
+                ctx.restore();
+
+                if (this.type === 'powerup') {
+                    ctx.fillStyle = 'white';
+                    ctx.font = "18px Arial Unicode MS"; 
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+                    ctx.fillText("🎁", this.x + this.width / 2, this.y + this.height / 2);
+                    ctx.textAlign = "left"; 
+                    ctx.textBaseline = "alphabetic"; 
+                }
+                
+                // Health Bar (Boss dan Enemy Level Tinggi)
+                if (this.type.startsWith('boss') || (this.type.startsWith('enemy') && this.maxHealth > 1)) {
+                    const barWidth = Math.min(this.width, 50);
+                    const barHeight = 5;
+                    const barX = this.x + (this.width / 2) - (barWidth / 2);
+                    const barY = this.y - 10;
+                    
+                    ctx.fillStyle = 'gray';
+                    ctx.fillRect(barX, barY, barWidth, barHeight);
+                    ctx.fillStyle = 'red';
+                    const currentWidth = (this.health / this.maxHealth) * barWidth;
+                    ctx.fillRect(barX, barY, currentWidth, barHeight);
+                    
+                    if (this.type.startsWith('boss')) {
+                        ctx.fillStyle = 'white';
+                        ctx.font = "6px 'Press Start 2P'";
+                        ctx.fillText(`BOSS`, barX + 5, barY - 2);
+                    }
+                }
+            }
+            update() {} 
+        }
+        
+        class Player extends Entity {
+             constructor() {
+                const initialHealth = selectedSkin.initialHealth || 3; 
+                super(GAME_WIDTH / 2 - 15, GAME_HEIGHT - 60, 30, 30, 'player', selectedSkin.color, initialHealth); 
+                this.maxHealth = initialHealth; 
+                this.speed = 5 * selectedSkin.speedModifier; 
+                this.shootCooldown = selectedSkin.shootCooldown; 
+                this.lastShot = 0;
+                this.isShooting = false;
+                this.powerup = 'None';
+                this.perk = selectedSkin.perk;
+                this.clone = null;
+                this.rockets = 3;
+                this.rocketCooldown = ROCKET_COOLDOWN; 
+                this.lastRocketUse = 0;
+                this.isInvulnerable = false; // I-frames
+                this.invulnerabilityTimeout = null;
+                this.threeKingShotCounter = 0; // New counter for THREEKING stun bullet
+             }
+             applyDamage(damage) {
+                 if (this.powerup === 'Invulnerability') return;
+                 if (this.isInvulnerable) return;
+                 
+                 this.health -= damage;
+                 updateHealthDisplay();
+                 
+                 // Mulai I-frames
+                 this.isInvulnerable = true;
+                 if (this.invulnerabilityTimeout) clearTimeout(this.invulnerabilityTimeout);
+                 this.invulnerabilityTimeout = setTimeout(() => {
+                     this.isInvulnerable = false;
+                 }, 300); // 300ms I-frames
+             }
+             
+             shoot(time) { 
+                if (!this.isShooting || time < this.lastShot + this.shootCooldown) return;
+                this.lastShot = time;
+                
+                let baseDamage = UPGRADE_STATE.damageLevel * 1; 
+                
+                const activeUpgrades = UPGRADE_STATE.activeUpgrades;
+
+                // --- SKIN PERK LOGIC (ULTIMATE_TERANA & THREEKING_NEW TIDAK BISA DIGABUNG DENGAN TOGGLE/POWERUP) ---
+
+                // Cek Skin Terana
+                if (this.perk === 'ULTIMATE_TERANA') {
+                    // 2 Laser Putih Panjang + 2 Peluru Club (♣)
+                    entities.push(new Bullet(this.x, this.y, 'up', 'player', 'laser_long', 10, 'white'));
+                    entities.push(new Bullet(this.x + this.width - 4, this.y, 'up', 'player', 'laser_long', 10, 'white'));
+                    entities.push(new Bullet(this.x + 5, this.y + 10, 'up', 'player', 'club', 10, 'white'));
+                    entities.push(new Bullet(this.x + this.width - 5 - 2, this.y + 10, 'up', 'player', 'club', 10, 'white'));
+                    return; 
+                }
+                
+                // Cek Skin THREEKING (Perk Baru: Dual Purple Laser + Grapple)
+                if (this.perk === 'THREEKING_NEW') {
+                    // Main Shot: Dual Purple Laser
+                    entities.push(new Bullet(this.x + 5, this.y, 'up', 'player', 'laser', 5, 'purple'));
+                    entities.push(new Bullet(this.x + this.width - 5 - 8, this.y, 'up', 'player', 'laser', 5, 'purple'));
+                    
+                    // ⚓ grapple (attractor) every 10 shots
+                    this.threeKingShotCounter++;
+                    if (this.threeKingShotCounter >= 10) {
+                        entities.push(new Bullet(this.x + this.width / 2 - 6, this.y, 'up', 'player', 'grapple', 0, 'white')); // Damage 0, only pull effect
+                        this.threeKingShotCounter = 0;
+                    }
+                    return; 
+                }
+
+                // --- POWERUP & TOGGLE/NORMAL LOGIC ---
+                
+                let bulletType = 'bullet';
+                let bulletDamage = baseDamage * selectedSkin.damageModifier; 
+                let bulletColor = 'lime';
+                let bulletsPerShot = 1;
+
+                // Toggled Upgrades
+                if (activeUpgrades.includes('red_laser') || this.powerup === 'LaserShot') {
+                    bulletType = 'laser_long'; 
+                    bulletDamage = 10; 
+                    bulletColor = 'red'; 
+                } else if (activeUpgrades.includes('spade_bullet')) {
+                    bulletType = 'spade';
+                    bulletDamage = 10;
+                    bulletColor = 'red';
+                } else if (activeUpgrades.includes('six_shot_fire')) {
+                    // Hanya untuk skin STANDAR
+                    if (selectedSkin.name === 'STANDAR') {
+                        bulletType = 'fire_bullet';
+                        bulletDamage = baseDamage * selectedSkin.damageModifier;
+                        bulletColor = 'orange';
+                        bulletsPerShot = 6;
+                    }
+                }
+                
+                // Powerup Overrides
+                if (this.powerup === 'LaserShot') { 
+                    bulletType = activeUpgrades.includes('red_laser') ? 'laser_long' : 'laser'; 
+                    bulletDamage = activeUpgrades.includes('red_laser') ? 10 : 5; 
+                    bulletColor = activeUpgrades.includes('red_laser') ? 'red' : 'magenta'; 
+                }
+                if (this.powerup === 'PhoenixPower') { bulletType = 'laser'; bulletDamage = 2; bulletColor = 'red'; }
+                
+                // Determine bullet count
+                if (this.perk === 'TRIPLE_PERMANENT' || this.powerup === 'TripleShoot') {
+                    bulletsPerShot = 3;
+                } else if (bulletsPerShot === 1 && activeUpgrades.includes('six_shot_fire') && selectedSkin.name === 'STANDAR') {
+                    bulletsPerShot = 6; // Set 6x shot for standard skin if toggled
+                }
+
+                // Fire Bullets
+                if (bulletsPerShot === 6) {
+                    for (let i = 0; i < 6; i++) {
+                        const offset = (i - 2.5) * 5; 
+                        entities.push(new Bullet(this.x + this.width / 2 - 2 + offset, this.y, 'up', 'player', bulletType, bulletDamage, bulletColor));
+                    }
+                } else if (bulletsPerShot === 3) {
+                    entities.push(new Bullet(this.x + this.width / 2 - 2, this.y, 'up', 'player', bulletType, bulletDamage, bulletColor));
+                    entities.push(new Bullet(this.x + 5, this.y + 10, 'up', 'player', bulletType, bulletDamage, bulletColor));
+                    entities.push(new Bullet(this.x + this.width - 5 - 2, this.y + 10, 'up', 'player', bulletType, bulletDamage, bulletColor));
+                } else {
+                    // Single shot
+                    entities.push(new Bullet(this.x + this.width / 2 - 2, this.y, 'up', 'player', bulletType, bulletDamage, bulletColor));
+                }
+
+                // Phoenix Power Diagonal
+                if (this.powerup === 'PhoenixPower') {
+                    entities.push(new Bullet(this.x, this.y, 'diag_left', 'player', 'laser', bulletDamage, bulletColor));
+                    entities.push(new Bullet(this.x + this.width - 4, this.y, 'diag_right', 'player', 'laser', bulletDamage, bulletColor));
+                }
+                
+                // Clone shot (only if toggled on)
+                if (activeUpgrades.includes('clone') && this.clone) {
+                    entities.push(new Bullet(this.clone.x + this.clone.width / 2 - 2, this.clone.y, 'up', 'player', bulletType, bulletDamage, bulletColor));
+                }
+             }
+             launchRocket(time) { 
+                if (this.rockets <= 0) { alert('Roket habis! Menunggu cooldown.'); return false; }
+                if (time < this.lastRocketUse + this.rocketCooldown) {
+                    const remainingTime = Math.ceil((this.lastRocketUse + this.rocketCooldown - time) / 1000);
+                    alert(`Roket dalam cooldown. Tersisa ${remainingTime} detik.`);
+                    return false;
+                }
+                entities.push(new Rocket(this.x + 5, this.y, 10, 30));
+                entities.push(new Rocket(this.x + this.width / 2 - 5, this.y, 10, 30));
+                entities.push(new Rocket(this.x + this.width - 15, this.y, 10, 30));
+                this.rockets--;
+                this.lastRocketUse = time;
+                updateRocketDisplay();
+                
+                screenShakeOffset = 7; 
+                
+                return true;
+             }
+             activatePowerup(type) { 
+                if (currentPowerupTimeout && type !== 'LaserShot' && type !== 'PhoenixPower') { clearTimeout(currentPowerupTimeout); }
+                if (laserTimeout && type === 'LaserShot') { clearTimeout(laserTimeout); }
+                if (phoenixLaserTimeout && type === 'PhoenixPower') { clearTimeout(phoenixLaserTimeout); }
+                
+                if (this.powerup !== 'LaserShot' && this.powerup !== 'PhoenixPower') {
+                   this.powerup = 'None'; 
+                   this.color = selectedSkin.color;
+                }
+                
+                this.powerup = type;
+                document.getElementById('powerup-display').innerText = type.toUpperCase();
+                
+                if (type === 'Invulnerability') {
+                    this.color = 'yellow';
+                } else if (type === 'LaserShot') {
+                    this.color = UPGRADE_STATE.hasRedLaserUpgrade ? 'red' : 'magenta'; 
+                    laserTimeout = setTimeout(() => { this.powerup = 'None'; this.color = selectedSkin.color; document.getElementById('powerup-display').innerText = 'NONE'; updatePhoenixLaserButton(); }, LASER_DURATION);
+                    updatePhoenixLaserButton();
+                    return; 
+                } else if (type === 'PhoenixPower') { 
+                    this.color = 'red'; 
+                    phoenixLaserTimeout = setTimeout(() => { this.powerup = 'None'; this.color = selectedSkin.color; document.getElementById('powerup-display').innerText = 'NONE'; updatePhoenixLaserButton(); }, POWERUP_DURATION); 
+                    updatePhoenixLaserButton();
+                    return;
+                }
+                currentPowerupTimeout = setTimeout(() => {
+                    this.powerup = 'None';
+                    this.color = selectedSkin.color; 
+                    document.getElementById('powerup-display').innerText = 'NONE';
+                    updatePhoenixLaserButton();
+                }, POWERUP_DURATION);
+             }
+             update() { 
+                this.x += analogDX * this.speed;
+                this.y += analogDY * this.speed;
+
+                this.x = Math.max(0, Math.min(GAME_WIDTH - this.width, this.x));
+                this.y = Math.max(0, Math.min(GAME_HEIGHT - this.height, this.y));
+                
+                // Clone Logic (Hanya jika diaktifkan via toggle)
+                const isCloneToggled = UPGRADE_STATE.activeUpgrades.includes('clone');
+
+                if (isCloneToggled && !this.clone && this.isAlive) { 
+                    this.clone = new Entity(this.x - 40, this.y, 30, 30, 'clone', 'blue');
+                    entities.push(this.clone);
+                } else if (!isCloneToggled && this.clone) {
+                    this.clone.isAlive = false;
+                    this.clone = null;
+                }
+                
+                if (this.clone && this.clone.isAlive) {
+                    this.clone.x = this.x - 40;
+                    this.clone.y = this.y;
+                    if (this.x < 40) { this.clone.x = this.x + 40; }
+                }
+             }
+        }
+
+        class Bullet extends Entity { 
+            constructor(x, y, direction, shooterType, type = 'bullet', damage = 1, color = 'lime') {
+                super(x, y, 4, 8, type, color, 1, damage);
+                
+                if (type === 'laser') { this.width = 8; this.height = 16; this.color = color; }
+                if (type === 'laser_long') { this.width = 10; this.height = 30; this.color = color; } 
+                if (type === 'spade' || type === 'club') { this.width = 10; this.height = 10; this.color = color; }
+                if (type === 'fire_bullet') { this.width = 10; this.height = 10; this.color = color; }
+                if (type === 'planet') { this.width = 14; this.height = 14; this.color = color; }
+                if (type === 'vortex') { this.width = 12; this.height = 12; this.color = color; }
+                if (type === 'grapple') { this.width = 12; this.height = 12; this.color = color; } // New size
+
+                this.speed = 10;
+                this.direction = direction;
+                this.shooterType = shooterType;
+                this.waveSpeedX = 0; 
+                if (direction === 'diag_left') this.waveSpeedX = -2;
+                if (direction === 'diag_right') this.waveSpeedX = 2;
+                
+                // Jika peluru musuh, berikan damage sesuai level
+                if(shooterType === 'enemy') {
+                    this.damage = currentLevel; 
+                }
+            }
+            draw() {
+                if (this.type === 'spade') {
+                    ctx.fillStyle = this.color; ctx.font = "16px Arial Unicode MS"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+                    ctx.fillText("♠", this.x + this.width / 2, this.y + this.height / 2);
+                } else if (this.type === 'club') {
+                    ctx.fillStyle = this.color; ctx.font = "16px Arial Unicode MS"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+                    ctx.fillText("♣", this.x + this.width / 2, this.y + this.height / 2);
+                } else if (this.type === 'fire_bullet') {
+                    ctx.fillStyle = this.color; ctx.font = "16px Arial Unicode MS"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+                    ctx.fillText("🔥", this.x + this.width / 2, this.y + this.height / 2);
+                } else if (this.type === 'planet') {
+                    ctx.fillStyle = this.color; ctx.font = "16px Arial Unicode MS"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+                    ctx.fillText("🪐", this.x + this.width / 2, this.y + this.height / 2);
+                } else if (this.type === 'vortex') {
+                    ctx.fillStyle = this.color; ctx.font = "16px Arial Unicode MS"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+                    ctx.fillText("🌀", this.x + this.width / 2, this.y + this.height / 2);
+                } else if (this.type === 'grapple') { // New: Grapple/Attractor
+                    ctx.fillStyle = this.color; ctx.font = "16px Arial Unicode MS"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+                    ctx.fillText("⚓", this.x + this.width / 2, this.y + this.height / 2);
+                }
+                else {
+                    super.draw();
+                }
+                 ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; 
+            }
+            update() {
+                this.y += (this.direction.startsWith('up') ? -this.speed : this.speed);
+                this.x += this.waveSpeedX;
+                if (this.y < -30 || this.y > GAME_HEIGHT + 30) this.isAlive = false;
+            }
+        }
+        
+        class Enemy extends Entity { 
+             constructor(x, y, level) {
+                super(x, y, 30, 30, 'enemy', 'red', level > 1 ? 2 : 1, 1);
+                this.maxHealth = level > 1 ? 2 : 1; 
+                this.speed = 1 + level * 0.5;
+                this.shootInterval = 1000 + (3000 / level);
+                this.lastShot = 0;
+                this.isStunned = false; // New state
+            }
+            update(time) {
+                if (this.isStunned) return; // Stunned enemies don't move or shoot
+
+                this.y += this.speed;
+                if (time > this.lastShot + this.shootInterval) {
+                    entities.push(new Bullet(this.x + this.width / 2 - 2, this.y + this.height, 'down', 'enemy'));
+                    this.lastShot = time;
+                }
+                if (this.y > GAME_HEIGHT) this.isAlive = false;
+            }
+        }
+        
+        class Boss1 extends Entity { 
+             constructor() { 
+                super(GAME_WIDTH / 2 - 40, -80, 80, 80, `boss1`, 'purple', 50, 3);
+                this.maxHealth = 50; this.level = 1; this.speedY = 0.5; this.speedX = 1; this.moveDirection = 1;
+                this.lastShot = 0; this.shootInterval = 800; this.lastBomb = 0; this.bombInterval = 10000;
+                this.isStunned = false; // New state
+             }
+             update(time) {
+                if (this.isStunned) return; // Stunned boss doesn't move or shoot
+
+                if (this.y < 50) {
+                    this.y += this.speedY; 
+                } else {
+                    this.x += this.speedX * this.moveDirection;
+                    if (this.x > GAME_WIDTH - this.width || this.x < 0) {
+                        this.moveDirection *= -1;
+                    }
+                }
+                
+                if (time > this.lastShot + this.shootInterval) {
+                    this.performAttack();
+                    this.lastShot = time;
+                }
+                
+                if (time > this.lastBomb + this.bombInterval) {
+                     entities.push(new Bomb(this.x + this.width / 2 - 7, this.y + this.height));
+                     this.lastBomb = time;
+                }
+             }
+             performAttack() {
+                 entities.push(new Bullet(this.x + 10, this.y + this.height, 'down', 'enemy', 'bullet', 2, 'yellow'));
+                 entities.push(new Bullet(this.x + this.width - 10, this.y + this.height, 'down', 'enemy', 'bullet', 2, 'yellow'));
+             }
+        }
+        
+        class Boss2 extends Boss1 {
+             constructor() {
+                 super();
+                 this.type = 'boss2';
+                 this.color = 'darkred';
+                 this.health = 150;
+                 this.maxHealth = 150;
+                 this.shootInterval = 500;
+                 this.speedX = 1.5;
+                 this.damage = 5;
+             }
+             performAttack() {
+                 // Spread shot
+                 entities.push(new Bullet(this.x + 10, this.y + this.height, 'down', 'enemy', 'bullet', 3, 'red'));
+                 entities.push(new Bullet(this.x + this.width / 2, this.y + this.height, 'down', 'enemy', 'bullet', 3, 'red'));
+                 entities.push(new Bullet(this.x + this.width - 10, this.y + this.height, 'down', 'enemy', 'bullet', 3, 'red'));
+                 
+                 // Diagonal shot
+                 entities.push(new Bullet(this.x + 5, this.y + this.height, 'diag_left', 'enemy', 'bullet', 3, 'red'));
+                 entities.push(new Bullet(this.x + this.width - 5, this.y + this.height, 'diag_right', 'enemy', 'bullet', 3, 'red'));
+             }
+        }
+
+        class Rocket extends Entity { constructor(x, y, w, h) { super(x, y, w, h, 'rocket', 'orange', 1, 50); this.speed = 15; } update() { this.y -= this.speed; if (this.y < -30) this.isAlive = false; } }
+        class Bomb extends Entity { constructor(x, y) { super(x, y, 15, 15, 'bomb', 'orange', 1, 5); this.speed = 3; } update() { this.y += this.speed; if (this.y > GAME_HEIGHT) this.isAlive = false; } }
+        class Powerup extends Entity { 
+            constructor(x, y, type) { super(x, y, 20, 20, 'powerup', 'gold', 1, 0); this.powerupType = type; this.speed = 2; } 
+            update() { this.y += this.speed; if (this.y > GAME_HEIGHT) this.isAlive = false; }
+        }
+        
+        class Particle extends Entity {
+            constructor(x, y, size, life, color) {
+                super(x, y, size, size, 'particle', color, 1, 0);
+                this.life = life; 
+                this.vx = (Math.random() - 0.5) * 2;
+                this.vy = (Math.random() - 0.5) * 2;
+                this.fadeRate = 1 / life;
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life--;
+                if (this.life <= 0) this.isAlive = false;
+            }
+            draw() {
+                ctx.globalAlpha = this.life * this.fadeRate;
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+                ctx.globalAlpha = 1.0;
+            }
+        }
+        
+        class Explosion {
+            constructor(x, y, count, size, speed, fade) {
+                for (let i = 0; i < count; i++) {
+                    entities.push(new Particle(x, y, size, 20 + Math.random() * 20, 'red'));
+                }
+            }
+        }
+
+        // --- Persistence (Koin, Skor, & Upgrade) ---
+        function loadUpgradeState() {
+            try {
+                const savedState = JSON.parse(localStorage.getItem('upgradeState'));
+                if (savedState) {
+                    Object.assign(UPGRADE_STATE, savedState);
+                    // Ensure activeUpgrades is an array and respects the limit
+                    if (!Array.isArray(UPGRADE_STATE.activeUpgrades)) UPGRADE_STATE.activeUpgrades = [];
+                    UPGRADE_STATE.activeUpgrades = UPGRADE_STATE.activeUpgrades.filter(key => TOGGLE_UPGRADES_MAP[key] && TOGGLE_UPGRADES_MAP[key].available()).slice(0, MAX_ACTIVE_UPGRADES);
+                }
+            } catch (e) { console.error("Error loading upgrade state:", e); }
+        }
+        function saveUpgradeState() { localStorage.setItem('upgradeState', JSON.stringify(UPGRADE_STATE)); }
+        function loadTotalCoins() {
+            try {
+                const savedCoins = localStorage.getItem('totalCoins');
+                totalCoins = savedCoins ? parseInt(savedCoins) : 0;
+            } catch (e) { totalCoins = 0; }
+        }
+        function saveTotalCoins() { localStorage.setItem('totalCoins', totalCoins); }
+        function updateCoinDisplay() {
+            document.getElementById('coin-display-game').innerText = gameCoins;
+            document.getElementById('coin-display-ui').innerText = totalCoins;
+            if (document.getElementById('shop-coin-display')) document.getElementById('shop-coin-display').innerText = totalCoins;
+        }
+
+        function loadHighScores() {
+            try {
+                const scores = JSON.parse(localStorage.getItem('highScores')) || [];
+                return scores.sort((a, b) => b - a).slice(0, 10);
+            } catch (e) { return []; }
+        }
+        function saveHighScore(newScore) {
+            let scores = loadHighScores();
+            if (newScore > 0) scores.push(newScore);
+            scores = scores.sort((a, b) => b - a).slice(0, 10);
+            localStorage.setItem('highScores', JSON.stringify(scores));
+        }
+        
+        // --- Game Logic Functions ---
+        
+        function checkAABB(rect1, rect2) {
+            if (!rect1 || !rect2) return false;
+            return rect1.x < rect2.x + rect2.width &&
+                   rect1.x + rect1.width > rect2.x &&
+                   rect1.y < rect2.y + rect2.height &&
+                   rect1.y + rect1.height > rect2.y;
+        }
+
+        function spawnEnemy() {
+            if (gameState !== 'PLAYING') return;
+            if (entities.some(e => e.type.startsWith('boss'))) return;
+            
+            const x = Math.random() * (GAME_WIDTH - 30);
+            const level = currentLevel; 
+            
+            entities.push(new Enemy(x, -30, level));
+        }
+        
+        function spawnBoss(level) {
+            screenShakeOffset = 10;
+            if (level === 1) entities.push(new Boss1());
+            else if (level === 2) entities.push(new Boss2());
+            else if (level > 2) entities.push(new Boss2()); 
+        }
+
+        function spawnPowerup(x, y) {
+             // Clone removed from powerup drop since it's a toggleable upgrade now
+             const types = ['TripleShoot', 'Invulnerability', 'LaserShot']; 
+             const type = types[Math.floor(Math.random() * types.length)];
+             entities.push(new Powerup(x, y, type));
+        }
+
+        function updateHealthDisplay() {
+            if (player) document.getElementById('health-display').innerText = player.health.toFixed(2);
+        }
+
+        function updateRocketDisplay() {
+            if (player) document.getElementById('rocket-display').innerText = player.rockets;
+        }
+        
+        function updatePhoenixLaserButton() {
+            const btn = document.getElementById('btn-phoenix-laser');
+            if (player && (player.perk === 'PHOENIX' || player.powerup === 'PhoenixPower')) {
+                btn.style.display = 'flex';
+                btn.onclick = () => { alert('Phoenix Special Attack: Tembakan tiga arah permanen aktif!'); };
+            } else {
+                btn.style.display = 'none';
+            }
+        }
+        
+        function checkBossSpawn() {
+            if (score >= nextBossTrigger && bossLevel < BOSS_TRIGGERS.length) {
+                 bossLevel++;
+                 spawnBoss(bossLevel);
+                 nextBossTrigger = BOSS_TRIGGERS[bossLevel]; // Set next trigger or undefined
+            }
+        }
+
+        function handleCollisions() { 
+            const playerRect = player;
+            
+            for (let i = entities.length - 1; i >= 0; i--) {
+                const entity = entities[i];
+                if (!entity.isAlive || entity === player || (player && entity === player.clone) || entity.type === 'particle') continue;
+
+                // --- PLAYER BULLET / ROCKET COLLISION ---
+                if ((entity.type.includes('bullet') && entity.shooterType === 'player') || entity.type.startsWith('laser') || entity.type === 'rocket' || entity.type === 'spade' || entity.type === 'club' || entity.type === 'fire_bullet' || entity.type === 'planet' || entity.type === 'vortex' || entity.type === 'grapple') {
+
+                    // 1. Grapple/Attractor Logic (No Damage, Only Pull)
+                    if (entity.type === 'grapple') {
+                         const AOE_RADIUS = 80; // Large area of effect
+                         
+                         // Find all enemies/bosses in the area
+                         const targetsInArea = entities.filter(e => 
+                             (e.type.startsWith('enemy') || e.type.startsWith('boss')) &&
+                             Math.hypot((e.x + e.width/2) - (entity.x + entity.width/2), (e.y + e.height/2) - (entity.y + entity.height/2)) < AOE_RADIUS
+                         );
+                         
+                         targetsInArea.forEach(e => {
+                            // Apply pull effect towards the center column (x = 180)
+                            const centerOfEntity = e.x + e.width / 2;
+                            const pullStrength = 3; 
+                            
+                            if (centerOfEntity < GAME_WIDTH / 2) {
+                                e.x = Math.min(e.x + pullStrength, GAME_WIDTH - e.width);
+                            } else if (centerOfEntity > GAME_WIDTH / 2) {
+                                e.x = Math.max(e.x - pullStrength, 0);
+                            }
+                         });
+                         
+                         // Destroy grapple if it hits a boss (so it doesn't linger and lag)
+                         if (entities.some(e => e.type.startsWith('boss') && checkAABB(entity, e))) {
+                             entity.isAlive = false;
+                         }
+                         
+                         continue; // Grapple continues to live and pull until it leaves screen or hits boss
+                    }
+
+                    // 2. Planet/Vortex Logic (AoE Damage/Stun)
+                    if (entity.type === 'planet') {
+                         // Planet (🪐) Area Damage (AoE)
+                         const planetDamage = entity.damage;
+                         const AOE_RADIUS = 40;
+                         
+                         const targetsInArea = entities.filter(e => 
+                             (e.type.startsWith('enemy') || e.type.startsWith('boss')) &&
+                             Math.hypot((e.x + e.width/2) - (entity.x + entity.width/2), (e.y + e.height/2) - (entity.y + entity.height/2)) < AOE_RADIUS
+                         );
+                         
+                         targetsInArea.forEach(e => {
+                            e.health -= planetDamage;
+                            if (e.health <= 0) {
+                                e.isAlive = false;
+                                handleEnemyDeath(e);
+                            }
+                         });
+                         entity.isAlive = false;
+                         continue; // Pindah ke entity berikutnya
+                    }
+                    
+                    if (entity.type === 'vortex') {
+                        for (let j = entities.length - 1; j >= 0; j--) {
+                            const target = entities[j];
+                            if (!target.isAlive || (!target.type.startsWith('enemy') && !target.type.startsWith('boss'))) continue;
+                            
+                            if (checkAABB(entity, target)) {
+                                target.health -= entity.damage;
+                                target.isStunned = true;
+                                setTimeout(() => {
+                                    if (target) target.isStunned = false; 
+                                }, 500); 
+                            }
+                        }
+                        entity.isAlive = false;
+                        continue;
+                    }
+                    
+                    // 3. Standard Damage-Dealing Bullet Collision
+                    for (let j = entities.length - 1; j >= 0; j--) {
+                        const target = entities[j];
+                        // Target harus Enemy, Boss, atau Powerup
+                        if (!target.isAlive || (!target.type.startsWith('enemy') && !target.type.startsWith('boss') && target.type !== 'powerup')) continue;
+                        
+                        if (checkAABB(entity, target)) {
+                            
+                            // Tentukan apakah peluru harus dihancurkan
+                            if (entity.type === 'rocket' || target.type.startsWith('boss')) { 
+                                 entity.isAlive = false; 
+                            } else if (!entity.type.startsWith('laser_long') && !target.type.startsWith('boss')) {
+                                 entity.isAlive = false; 
+                            }
+                            
+                            // Terapkan damage
+                            if (target.type.startsWith('enemy') || target.type.startsWith('boss')) {
+                                target.health -= entity.damage;
+                                
+                                if (target.health <= 0) {
+                                    handleEnemyDeath(target);
+                                }
+                            } else if (target.type === 'powerup') {
+                                // Ambil powerup
+                                if (player) player.activatePowerup(target.powerupType);
+                                target.isAlive = false;
+                            }
+                            if (entity.isAlive === false) break; 
+                        }
+                    }
+                } 
+                
+                // Tabrakan Musuh / Peluru Musuh dengan Player
+                else if ((entity.type.startsWith('enemy') || entity.type.startsWith('boss') || (entity.type.includes('bullet') && entity.shooterType === 'enemy') || entity.type === 'bomb') && checkAABB(entity, playerRect)) {
+                    
+                    if (player.powerup === 'Invulnerability') {
+                        if (!entity.type.startsWith('boss')) entity.isAlive = false;
+                    } else {
+                        player.applyDamage(entity.damage); 
+                        
+                        if(!entity.type.startsWith('boss')) { 
+                            entity.isAlive = false;
+                            entities.push(new Explosion(entity.x + entity.width / 2, entity.y + entity.height / 2, 5, 2, 2, 0.05)); 
+                        }
+                    }
+                }
+            }
+        }
+        
+        function handleEnemyDeath(target) {
+             target.isAlive = false;
+             entities.push(new Explosion(target.x + target.width / 2, target.y + target.height / 2, 50, 4, 5, 0.1)); 
+             
+             if(target.type.startsWith('boss')) {
+                 score += 50; 
+                 gameCoins += 100;
+                 if (player) player.activatePowerup('LaserShot'); 
+             } else {
+                 score += 10;
+                 gameCoins += 10;
+             }
+             
+             if (player) {
+                 player.health = Math.min(player.maxHealth, player.health + HEALTH_PER_KILL);
+                 updateHealthDisplay();
+             }
+
+             if (!target.type.startsWith('boss')) {
+                 enemiesKilled++;
+                 if (enemiesKilled >= 3) {
+                     spawnPowerup(target.x, target.y);
+                     enemiesKilled = 0;
+                 }
+             } 
+        }
+
+        function gameLoop(time) {
+            const deltaTime = time - lastTime;
+            lastTime = time;
+
+            if (gameState === 'PLAYING') {
+                ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+                // Terapkan Screen Shake
+                if (screenShakeOffset > 0) {
+                    const shakeX = (Math.random() - 0.5) * screenShakeOffset * 2;
+                    const shakeY = (Math.random() - 0.5) * screenShakeOffset * 2;
+                    ctx.translate(shakeX, shakeY);
+                    screenShakeOffset *= 0.9;
+                    if (screenShakeOffset < 0.5) screenShakeOffset = 0;
+                }
+                
+                // Update dan Draw Entitas
+                for (let i = entities.length - 1; i >= 0; i--) {
+                    const entity = entities[i];
+                    entity.update(time);
+                    entity.draw();
+                }
+
+                // Reset Screen Shake
+                if (screenShakeOffset > 0) {
+                    ctx.setTransform(1, 0, 0, 1, 0, 0); 
+                }
+
+                handleCollisions();
+
+                // Bersihkan entitas mati
+                entities = entities.filter(e => e.isAlive);
+                
+                player.shoot(time);
+
+                document.getElementById('score-display').innerText = score;
+                document.getElementById('coin-display-game').innerText = gameCoins; 
+
+                checkBossSpawn();
+
+                if (player.health <= 0) {
+                    entities.push(new Explosion(player.x + player.width / 2, player.y + player.height / 2, 100, 8, 5, 0.1));
+                    player.isAlive = false; 
+                    endGame("Skor Anda akan disimpan.", false);
+                    return;
+                }
+            }
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+        
+        // --- Game Setup & Menu Functions ---
+        
+        function startGame(level) {
+            document.getElementById('level-select-screen').style.display = 'none';
+            document.getElementById('game-info').style.display = 'block';
+            document.getElementById('controls').style.display = 'block';
+            initGame(level);
+        }
+        
+        function initGame(level) {
+            if (animationFrameId) { window.cancelAnimationFrame(animationFrameId); }
+            if (spawnInterval) { clearInterval(spawnInterval); }
+            
+            currentLevel = level;
+            score = 0;
+            gameCoins = 0; 
+            enemiesKilled = 0;
+            entities = [];
+            
+            nextBossTrigger = BOSS_TRIGGERS[0]; 
+            bossLevel = 0;
+            
+            player = new Player(); 
+            entities.push(player);
+            
+            // Re-check clone on start if toggled
+            if (UPGRADE_STATE.activeUpgrades.includes('clone')) { 
+                player.clone = new Entity(player.x - 40, player.y, 30, 30, 'clone', 'blue');
+                entities.push(player.clone);
+            }
+
+            clearTimeout(currentPowerupTimeout);
+            clearTimeout(laserTimeout);
+            clearTimeout(phoenixLaserTimeout);
+            player.powerup = 'None';
+            
+            updateHealthDisplay();
+            updateRocketDisplay(); 
+            updatePhoenixLaserButton(); 
+            updateCoinDisplay(); 
+            
+            gameState = 'PLAYING';
+            spawnInterval = setInterval(spawnEnemy, currentLevel === 1 ? 1500 : 1000); 
+            setupGameControls(); 
+            lastTime = performance.now();
+            animationFrameId = requestAnimationFrame(gameLoop); 
+            
+            document.getElementById('game-over-screen').style.display = 'none';
+        }
+
+        function endGame(message, success = false) {
+            gameState = 'GAME_OVER';
+            saveHighScore(score); 
+            
+            totalCoins += gameCoins;
+            saveTotalCoins();
+            updateCoinDisplay();
+
+            if (spawnInterval) clearInterval(spawnInterval);
+            if (animationFrameId) window.cancelAnimationFrame(animationFrameId);
+            
+            analogDX = 0; 
+            analogDY = 0;
+            
+            cleanupGameControls(); 
+            
+            document.getElementById('final-message').innerText = success ? "SELAMAT! " + message : "GAME OVER!";
+            document.getElementById('final-score').innerText = score;
+            document.getElementById('game-over-screen').style.display = 'flex';
+            document.getElementById('controls').style.display = 'none';
+            document.getElementById('game-info').style.display = 'none';
+        }
+
+        function showMenu() {
+            gameState = 'MENU';
+            document.getElementById('menu-container').style.display = 'flex';
+            document.getElementById('level-select-screen').style.display = 'none';
+            document.getElementById('game-over-screen').style.display = 'none';
+            document.getElementById('skin-select-screen').style.display = 'none';
+            document.getElementById('image-upload-screen').style.display = 'none';
+            document.getElementById('high-score-screen').style.display = 'none';
+            document.getElementById('hud-settings-screen').style.display = 'none';
+            document.getElementById('shop-menu').style.display = 'none';
+            document.getElementById('toggle-screen').style.display = 'none';
+            document.getElementById('controls').style.display = 'none';
+            document.getElementById('game-info').style.display = 'none';
+
+            if (animationFrameId) { window.cancelAnimationFrame(animationFrameId); animationFrameId = null; }
+            if (spawnInterval) clearInterval(spawnInterval);
+            
+            analogDX = 0; analogDY = 0;
+            
+            disableHudSettingsMode();
+            cleanupGameControls(); 
+            
+            loadTotalCoins();
+            loadUpgradeState(); 
+            updateCoinDisplay();
+        }
+
+        function showToggleScreen() {
+            gameState = 'TOGGLE_MENU';
+            document.getElementById('menu-container').style.display = 'none';
+            document.getElementById('toggle-screen').style.display = 'flex';
+            
+            loadUpgradeState();
+            renderToggleOptions();
+        }
+
+        function renderToggleOptions() {
+             const container = document.getElementById('toggle-options');
+             container.innerHTML = '';
+             document.getElementById('active-skill-count').innerText = UPGRADE_STATE.activeUpgrades.length;
+
+             for (const key in TOGGLE_UPGRADES_MAP) {
+                 const upgrade = TOGGLE_UPGRADES_MAP[key];
+                 if (upgrade.available()) {
+                     const isReqMet = !upgrade.skinReq || selectedSkin.name === upgrade.skinReq;
+                     const isActive = UPGRADE_STATE.activeUpgrades.includes(key);
+                     
+                     const item = document.createElement('div');
+                     item.className = 'toggle-item';
+
+                     let description = upgrade.name;
+                     if (upgrade.skinReq) {
+                         description += ` (Hanya Skin ${upgrade.skinReq})`;
+                     }
+
+                     const descDiv = document.createElement('div');
+                     descDiv.className = 'toggle-item-desc';
+                     descDiv.innerText = description;
+                     descDiv.style.color = isReqMet ? 'white' : 'gray';
+
+                     const button = document.createElement('button');
+                     button.className = 'retro-button toggle-btn';
+                     button.innerText = isActive ? 'AKTIF' : 'NONAKTIF';
+                     button.style.borderColor = isActive ? 'lime' : 'cyan';
+                     button.disabled = !isActive && UPGRADE_STATE.activeUpgrades.length >= MAX_ACTIVE_UPGRADES;
+                     button.disabled = button.disabled || !isReqMet;
+                     button.onclick = () => toggleUpgrade(key);
+                     
+                     if (button.disabled && !isActive) {
+                          button.innerText = 'LIMIT';
+                          button.style.borderColor = 'red';
+                     }
+                     
+                     item.appendChild(descDiv);
+                     item.appendChild(button);
+                     container.appendChild(item);
+                 }
+             }
+        }
+
+        function toggleUpgrade(key) {
+             const index = UPGRADE_STATE.activeUpgrades.indexOf(key);
+             
+             if (index > -1) {
+                 // Deactivate
+                 UPGRADE_STATE.activeUpgrades.splice(index, 1);
+             } else {
+                 // Activate
+                 if (UPGRADE_STATE.activeUpgrades.length < MAX_ACTIVE_UPGRADES) {
+                     // Check skin requirement
+                     const upgrade = TOGGLE_UPGRADES_MAP[key];
+                     if (upgrade.skinReq && selectedSkin.name !== upgrade.skinReq) {
+                         alert(`Skill ini hanya dapat digunakan dengan skin ${upgrade.skinReq}!`);
+                         return;
+                     }
+                     UPGRADE_STATE.activeUpgrades.push(key);
+                 } else {
+                     alert(`Maksimal 2 skill aktif! Nonaktifkan skill lain terlebih dahulu.`);
+                     return;
+                 }
+             }
+
+             saveUpgradeState();
+             renderToggleOptions();
+        }
+
+        function showLevelSelect() {
+            gameState = 'LEVEL_SELECT';
+            document.getElementById('skin-select-screen').style.display = 'none';
+            document.getElementById('level-select-screen').style.display = 'flex';
+        }
+        
+        function showSkinSelect() {
+            gameState = 'SKIN_SELECT';
+            document.getElementById('menu-container').style.display = 'none';
+            document.getElementById('skin-select-screen').style.display = 'flex';
+            document.getElementById('shop-menu').style.display = 'none';
+            
+            loadUpgradeState(); 
+            renderSkinOptions();
+            updateSkinDisplay(selectedSkin.name); 
+        }
+
+        function showShopMenu() {
+            gameState = 'SHOP';
+            document.getElementById('menu-container').style.display = 'none';
+            document.getElementById('shop-menu').style.display = 'flex';
+            document.getElementById('skin-select-screen').style.display = 'none';
+            document.getElementById('hud-settings-screen').style.display = 'none';
+            
+            loadUpgradeState();
+            loadTotalCoins();
+            updateCoinDisplay();
+            updateShopUI();
+        }
+        
+        function showHighScore() {
+            gameState = 'HIGH_SCORE';
+            document.getElementById('menu-container').style.display = 'none';
+            const screen = document.getElementById('high-score-screen');
+            screen.style.display = 'flex';
+            
+            const list = document.getElementById('high-score-list');
+            list.innerHTML = '';
+            const scores = loadHighScores();
+            
+            scores.forEach((s, index) => {
+                const li = document.createElement('li');
+                li.style.listStyleType = 'none';
+                li.style.margin = '5px';
+                li.style.color = index === 0 ? 'gold' : 'white';
+                li.innerHTML = `${index + 1}. ${s}`;
+                list.appendChild(li);
+            });
+        }
+
+        // --- Shop Functions ---
+
+        function updateShopUI() {
+            // Damage Upgrade
+            document.getElementById('current-damage-level').innerText = UPGRADE_STATE.damageLevel;
+            const damageButton = document.getElementById('damage-upgrade-item').querySelector('button');
+            if (UPGRADE_STATE.damageLevel >= 10) {
+                document.getElementById('damage-upgrade-price').innerHTML = 'MAX';
+                damageButton.innerText = 'MAX';
+                damageButton.disabled = true;
+            } else {
+                document.getElementById('damage-upgrade-price').innerHTML = '50🪙';
+                damageButton.innerText = 'Upgrade';
+                damageButton.disabled = false;
+            }
+            
+            // Item Lain
+            document.getElementById('clone-button').innerText = UPGRADE_STATE.hasClone ? 'Dibeli' : 'Beli';
+            document.getElementById('clone-button').disabled = UPGRADE_STATE.hasClone;
+            
+            document.getElementById('red-laser-button').innerText = UPGRADE_STATE.hasRedLaserUpgrade ? 'Dibeli' : 'Beli';
+            document.getElementById('red-laser-button').disabled = UPGRADE_STATE.hasRedLaserUpgrade;
+
+            document.getElementById('spade-bullet-button').innerText = UPGRADE_STATE.hasSpadeBullet ? 'Dibeli' : 'Beli';
+            document.getElementById('spade-bullet-button').disabled = UPGRADE_STATE.hasSpadeBullet;
+            
+            document.getElementById('six-shot-price').innerHTML = `${SIX_SHOT_PRICE}🪙`;
+            document.getElementById('six-shot-button').innerText = UPGRADE_STATE.hasSixShotFire ? 'Dibeli' : (totalCoins >= SIX_SHOT_PRICE ? 'BELI' : 'BELI');
+            document.getElementById('six-shot-button').disabled = UPGRADE_STATE.hasSixShotFire || totalCoins < SIX_SHOT_PRICE;
+
+            // Skin Terana 
+            const teranaButton = document.getElementById('terana-skin-button');
+            if (UPGRADE_STATE.hasTeranaSkin) {
+                 teranaButton.innerText = selectedSkin.name === 'TERANA' ? 'TERPILIH' : 'PILIH SKIN';
+                 teranaButton.disabled = selectedSkin.name === 'TERANA';
+                 document.getElementById('terana-price').innerHTML = 'Pilih';
+            } else {
+                 teranaButton.innerText = totalCoins >= 8000 ? 'BELI' : 'BELI';
+                 teranaButton.disabled = totalCoins < 8000;
+                 document.getElementById('terana-price').innerHTML = '8000';
+            }
+
+            // Skin THREEKING
+            const threeKingButton = document.getElementById('threeking-skin-button');
+            if (UPGRADE_STATE.hasThreeKingSkin) {
+                 threeKingButton.innerText = selectedSkin.name === 'THREEKING' ? 'TERPILIH' : 'PILIH SKIN';
+                 threeKingButton.disabled = selectedSkin.name === 'THREEKING';
+                 document.getElementById('threeking-price').innerHTML = 'Pilih';
+            } else {
+                 threeKingButton.innerText = totalCoins >= 5000 ? 'BELI' : 'BELI';
+                 threeKingButton.disabled = totalCoins < 5000;
+                 document.getElementById('threeking-price').innerHTML = '5000';
+            }
+        }
+
+        function buyItem(item) {
+            let cost = 0;
+            let owned = false;
+            let actionSuccess = false;
+
+            if (item === 'terana_skin') {
+                cost = 8000;
+                if (UPGRADE_STATE.hasTeranaSkin) { selectedSkin = SKINS.TERANA; actionSuccess = true; }
+                else if (totalCoins >= cost) { UPGRADE_STATE.hasTeranaSkin = true; selectedSkin = SKINS.TERANA; actionSuccess = true; }
+            } else if (item === 'threeking_skin') {
+                cost = 5000;
+                if (UPGRADE_STATE.hasThreeKingSkin) { selectedSkin = SKINS.THREEKING; actionSuccess = true; }
+                else if (totalCoins >= cost) { UPGRADE_STATE.hasThreeKingSkin = true; selectedSkin = SKINS.THREEKING; actionSuccess = true; }
+            } else if (item === 'six_shot') {
+                cost = SIX_SHOT_PRICE;
+                if (UPGRADE_STATE.hasSixShotFire) { owned = true; }
+                else if (totalCoins >= cost) { UPGRADE_STATE.hasSixShotFire = true; actionSuccess = true; }
+            } else if (item === 'clone' && !UPGRADE_STATE.hasClone) { cost = 500; UPGRADE_STATE.hasClone = true; }
+            else if (item === 'red_laser' && !UPGRADE_STATE.hasRedLaserUpgrade) { cost = 1000; UPGRADE_STATE.hasRedLaserUpgrade = true; }
+            else if (item === 'spade_bullet' && !UPGRADE_STATE.hasSpadeBullet) { cost = 800; UPGRADE_STATE.hasSpadeBullet = true; }
+            else if (item === 'damage_upgrade' && UPGRADE_STATE.damageLevel < 10) { cost = 50; UPGRADE_STATE.damageLevel++; }
+            else { owned = true; }
+            
+            if (owned) { alert("Anda sudah memiliki item ini atau mencapai level maksimum!"); return; }
+
+            if (cost > 0) {
+                if (totalCoins >= cost) {
+                    totalCoins -= cost;
+                    saveTotalCoins();
+                    saveUpgradeState();
+                    alert(`Pembelian ${item.replace('_', ' ').toUpperCase()} berhasil!`);
+                    actionSuccess = true;
+                } else {
+                    alert("Koin tidak cukup! (" + cost + "🪙 dibutuhkan)");
+                    return;
+                }
+            }
+            
+            if (actionSuccess) {
+                updateShopUI();
+                if (item.includes('_skin')) {
+                    // Update skin display di menu
+                    renderSkinOptions();
+                    updateSkinDisplay(selectedSkin.name); 
+                }
+            }
+        }
+        
+        // --- Skin Select Functions ---
+        
+        function updateSkinDisplay(skinName) {
+            const skin = SKINS[Object.keys(SKINS).find(key => SKINS[key].name === skinName)];
+            if (!skin) return; 
+
+            selectedSkin = skin;
+            document.getElementById('skin-description').innerText = `${skin.name}: ${skin.desc}`;
+            
+            document.querySelectorAll('#skin-options .retro-button').forEach(btn => {
+                btn.style.borderColor = btn.innerText.includes(skinName) ? 'lime' : 'cyan';
+            });
+            updateShopUI(); 
+            loadUpgradeState(); // Reload active upgrades to check skin requirements
+            renderToggleOptions(); // Update toggle screen for new skin
+        }
+
+        function renderSkinOptions() { 
+            const container = document.getElementById('skin-options');
+            container.innerHTML = '';
+            
+            for (const key in SKINS) {
+                const skin = SKINS[key];
+                
+                if (skin.name === 'TERANA' && !UPGRADE_STATE.hasTeranaSkin) continue;
+                if (skin.name === 'THREEKING' && !UPGRADE_STATE.hasThreeKingSkin) continue;
+                
+                const button = document.createElement('div');
+                button.className = 'retro-button';
+                button.innerText = skin.name + (skin.name === 'TERANA' || skin.name === 'THREEKING' ? ' (OWNED)' : '');
+                button.style.color = skin.color;
+                
+                button.onclick = () => updateSkinDisplay(skin.name);
+                
+                if (selectedSkin.name === skin.name) {
+                    button.style.borderColor = 'lime';
+                }
+
+                container.appendChild(button);
+            }
+        }
+
+        // --- Custom Image Functions (Unchanged) ---
+
+        function loadCustomImages() {
+            ['player', 'enemy', 'boss'].forEach(type => {
+                const dataUrl = localStorage.getItem(`customImage_${type}`);
+                if (dataUrl) {
+                    const img = new Image();
+                    img.onload = () => {
+                        CUSTOM_IMAGES[type] = img;
+                    };
+                    img.src = dataUrl;
+                } else {
+                    CUSTOM_IMAGES[type] = null;
+                }
+            });
+        }
+
+        function handleImageUpload(input, type) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    CUSTOM_IMAGES[type] = img;
+                    localStorage.setItem(`customImage_${type}`, e.target.result);
+                    alert(`Gambar ${type.toUpperCase()} berhasil diupload!`);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function clearCustomImage(type) {
+             CUSTOM_IMAGES[type] = null;
+             localStorage.removeItem(`customImage_${type}`);
+             document.getElementById(`upload-${type}`).value = '';
+             alert(`Gambar ${type.toUpperCase()} telah direset ke default.`);
+        }
+
+        function showImageUpload() {
+            gameState = 'IMAGE_UPLOAD';
+            document.getElementById('menu-container').style.display = 'none';
+            document.getElementById('image-upload-screen').style.display = 'flex';
+        }
+
+        // --- HUD/Control Functions (FIXED) ---
+
+        function loadHudSettings() {
+            try {
+                const savedSettings = JSON.parse(localStorage.getItem('hudSettings'));
+                Object.assign(currentHudSettings, savedSettings || DEFAULT_HUD_SETTINGS);
+                applyHudSettings();
+            } catch (e) {
+                currentHudSettings = DEFAULT_HUD_SETTINGS;
+                applyHudSettings();
+            }
+        }
+
+        function applyHudSettings() {
+            for (const id in currentHudSettings) {
+                const element = document.getElementById(id);
+                if (element) {
+                    const settings = currentHudSettings[id];
+                    element.style.width = `${settings.width}px`;
+                    element.style.height = `${settings.height}px`;
+
+                    // Reset semua properti posisi agar tidak ada yang tumpang tindih
+                    element.style.top = ''; element.style.left = '';
+                    element.style.right = ''; element.style.bottom = '';
+                    
+                    // Terapkan properti yang ada di pengaturan
+                    if (settings.top !== undefined) element.style.top = `${settings.top}px`;
+                    if (settings.left !== undefined) element.style.left = `${settings.left}px`;
+                    if (settings.right !== undefined) element.style.right = `${settings.right}px`;
+                    if (settings.bottom !== undefined) element.style.bottom = `${settings.bottom}px`;
+                    
+                    element.style.position = 'absolute'; // Pastikan posisi mutlak
+                }
+            }
+        }
+
+        function showHudSettings() {
+            gameState = 'HUD_SETTINGS';
+            document.getElementById('menu-container').style.display = 'none';
+            document.getElementById('hud-settings-screen').style.display = 'flex';
+            document.getElementById('controls').style.display = 'block'; 
+            enableHudSettingsMode();
+        }
+
+        function enableHudSettingsMode() {
+            const controls = document.querySelectorAll('#controls > div');
+            controls.forEach(control => {
+                if (control.id === 'analog-pad') {
+                    control.classList.add('hud-draggable');
+                } else {
+                    control.classList.add('hud-draggable', 'hud-resizable');
+                }
+                
+                // Dapatkan nilai gaya yang dihitung (computed style)
+                const computedStyle = window.getComputedStyle(control);
+                
+                // Jika belum ada style inline, gunakan computed style untuk mengisi nilai awal
+                // dan hapus properti lawan agar posisi tidak ambigu (left vs right)
+                if (!control.style.left && computedStyle.left !== 'auto' && parseFloat(computedStyle.left) !== 0) {
+                    control.style.left = computedStyle.left;
+                    control.style.right = ''; // Clear right if left is set
+                }
+                if (!control.style.right && computedStyle.right !== 'auto' && parseFloat(computedStyle.right) !== 0) {
+                    control.style.right = computedStyle.right;
+                    control.style.left = ''; // Clear left if right is set
+                }
+
+                if (!control.style.top && computedStyle.top !== 'auto' && parseFloat(computedStyle.top) !== 0) {
+                    control.style.top = computedStyle.top;
+                    control.style.bottom = ''; // Clear bottom if top is set
+                }
+                if (!control.style.bottom && computedStyle.bottom !== 'auto' && parseFloat(computedStyle.bottom) !== 0) {
+                    control.style.bottom = computedStyle.bottom;
+                    control.style.top = ''; // Clear top if bottom is set
+                }
+                
+                // PENTING: Untuk memicu posisi agar tidak menggunakan properti "default" CSS
+                control.style.position = 'absolute'; 
+
+                setupDragAndResize(control);
+            });
+        }
+        
+        function disableHudSettingsMode() {
+            const controls = document.querySelectorAll('#controls > div');
+            controls.forEach(control => {
+                control.classList.remove('hud-draggable', 'hud-resizable');
+            });
+        }
+
+        function saveHudSettings() {
+            const settings = {};
+            const controls = document.querySelectorAll('#controls > div');
+            controls.forEach(control => {
+                const controlSettings = {};
+
+                controlSettings.width = control.offsetWidth;
+                controlSettings.height = control.offsetHeight;
+                
+                // Hanya simpan properti yang memiliki nilai style inline
+                if (control.style.left) controlSettings.left = parseFloat(control.style.left);
+                else if (control.style.right) controlSettings.right = parseFloat(control.style.right);
+                
+                if (control.style.top) controlSettings.top = parseFloat(control.style.top);
+                else if (control.style.bottom) controlSettings.bottom = parseFloat(control.style.bottom);
+
+                settings[control.id] = controlSettings;
+            });
+            
+            localStorage.setItem('hudSettings', JSON.stringify(settings));
+            currentHudSettings = settings;
+            applyHudSettings();
+            disableHudSettingsMode();
+            alert('Pengaturan HUD disimpan!');
+            showMenu();
+        }
+
+        function resetHudSettings() {
+            localStorage.removeItem('hudSettings');
+            currentHudSettings = DEFAULT_HUD_SETTINGS;
+            applyHudSettings();
+            alert('Pengaturan HUD direset ke default. Simpan atau kembali ke menu.');
+            enableHudSettingsMode();
+        }
+        
+        let activeControl = null;
+        let isResizing = false;
+        let startX, startY, startW, startH, startLeft, startTop, startRight, startBottom;
+
+        function setupDragAndResize(control) {
+             control.onpointerdown = (e) => {
+                if (gameState !== 'HUD_SETTINGS') return;
+
+                if (e.target.classList.contains('hud-resizable') && e.offsetX > control.offsetWidth - 20 && e.offsetY > control.offsetHeight - 20) {
+                    isResizing = true;
+                    e.preventDefault();
+                    e.stopPropagation();
+                } else {
+                    isResizing = false;
+                }
+                
+                activeControl = control;
+                startX = e.clientX;
+                startY = e.clientY;
+                startW = control.offsetWidth;
+                startH = control.offsetHeight;
+
+                startLeft = control.style.left ? parseFloat(control.style.left) : null;
+                startTop = control.style.top ? parseFloat(control.style.top) : null;
+                startRight = control.style.right ? parseFloat(control.style.right) : null;
+                startBottom = control.style.bottom ? parseFloat(control.style.bottom) : null;
+                
+                control.setPointerCapture(e.pointerId);
+            };
+            
+            control.onpointermove = (e) => {
+                 if (activeControl !== control) return;
+                 const dx = e.clientX - startX;
+                 const dy = e.clientY - startY;
+
+                 if (isResizing) {
+                     const newW = Math.max(50, startW + dx);
+                     const newH = Math.max(50, startH + dy);
+                     control.style.width = `${newW}px`;
+                     control.style.height = `${newH}px`;
+                 } else {
+                     if (startLeft !== null) control.style.left = `${startLeft + dx}px`;
+                     else if (startRight !== null) control.style.right = `${startRight - dx}px`;
+
+                     if (startTop !== null) control.style.top = `${startTop + dy}px`;
+                     else if (startBottom !== null) control.style.bottom = `${startBottom - dy}px`;
+                 }
+                 e.preventDefault();
+            };
+            
+            control.onpointerup = (e) => {
+                if (activeControl === control) {
+                    activeControl.releasePointerCapture(e.pointerId);
+                    activeControl = null;
+                    isResizing = false;
+                }
+            };
+        }
+
+        function setupGameControls() {
+            const analogPad = document.getElementById('analog-pad');
+            const analogStick = document.getElementById('analog-stick');
+            
+            // Get analog center based on applied/default settings
+            const rect = analogPad.getBoundingClientRect();
+            const gameRect = document.getElementById('game-area').getBoundingClientRect();
+            analogCenter.x = rect.left + rect.width / 2 - gameRect.left;
+            analogCenter.y = rect.top + rect.height / 2 - gameRect.top;
+            
+            const startDrag = (event) => {
+                isAnalogDragging = true;
+                analogPad.setPointerCapture(event.pointerId);
+                handleMove(event);
+            };
+
+            const endDrag = (event) => {
+                isAnalogDragging = false;
+                analogStick.style.transform = 'translate(-50%, -50%)';
+                analogDX = 0;
+                analogDY = 0;
+            };
+
+            const handleMove = (event) => {
+                if (!isAnalogDragging) return;
+
+                // Hitung posisi relatif ke game-area
+                const touchX = event.clientX - gameRect.left;
+                const touchY = event.clientY - gameRect.top;
+                
+                let dx = touchX - analogCenter.x;
+                let dy = touchY - analogCenter.y;
+                
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance > ANALOG_RADIUS) {
+                    dx = (dx / distance) * ANALOG_RADIUS;
+                    dy = (dy / distance) * ANALOG_RADIUS;
+                }
+
+                // Posisikan stik
+                analogStick.style.transform = `translate(${dx - analogStick.offsetWidth / 2}px, ${dy - analogStick.offsetHeight / 2}px)`;
+                analogDX = dx / ANALOG_RADIUS;
+                analogDY = dy / ANALOG_RADIUS;
+            };
+
+            analogPad.onpointerdown = startDrag;
+            analogPad.onpointerup = endDrag;
+            analogPad.onpointercancel = endDrag;
+            analogPad.onpointermove = handleMove;
+
+            document.getElementById('btn-shoot').onpointerdown = () => { if(player) player.isShooting = true; };
+            document.getElementById('btn-shoot').onpointerup = () => { if(player) player.isShooting = false; };
+            document.getElementById('btn-rocket').onclick = () => { if(player) player.launchRocket(performance.now()); };
+            document.getElementById('btn-powerup').onclick = () => { if(player) player.rockets = Math.min(10, player.rockets + 1); updateRocketDisplay(); alert('1 Rocket added!'); };
+        }
+        
+        function cleanupGameControls() {
+            const analogPad = document.getElementById('analog-pad');
+            analogPad.onpointerdown = null; analogPad.onpointerup = null; analogPad.onpointercancel = null; analogPad.onpointermove = null;
+            document.getElementById('btn-shoot').onpointerdown = null;
+            document.getElementById('btn-shoot').onpointerup = null;
+            document.getElementById('btn-rocket').onclick = null;
+            document.getElementById('btn-powerup').onclick = null;
+        }
+
+
+        // --- Inisialisasi Akhir ---
+        
+        loadCustomImages(); 
+        loadHudSettings(); 
+        loadUpgradeState();
+        loadTotalCoins();
+        
+        // PENTING: Hitung harga Six-Shot Firepower
+        document.getElementById('six-shot-price').innerHTML = `${SIX_SHOT_PRICE}🪙`;
+        
+        showMenu();
+    </script>
+</body>
+</html>
